@@ -1,180 +1,108 @@
-class JoystickRoverCard extends HTMLElement {
+// --- NOUVELLE LIGNE À AJOUTER : Importation de LitElement (Nécessaire pour le contexte Lovelace)
+import { LitElement, html, css } from 'lit'; 
+
+// --- CHANGEMENT DE LA LIGNE D'HÉRITAGE ---
+// Remplacer "extends HTMLElement" par "extends LitElement"
+class JoystickRoverCard extends LitElement {
+
+    // 1. Initialisation : Le constructeur doit appeler super() en premier.
     constructor() {
         super();
-        this.attachShadow({ mode: 'open' }); 
         
-        // Définition de la taille du rayon de la base pour le calcul futur (en pixels)
-        // La base (container) sera de 200px. Son rayon est 100px.
+        // Les variables sont maintenant des "properties" dans LitElement (c'est plus propre)
         this.baseRadius = 100;
-        
-        // La bille/manche (handle) fait 60px. Son rayon est 30px.
         this.handleRadius = 30;
-        
-        // Limite maximale de déplacement du centre du handle (100px - 30px)
         this.maxDistance = this.baseRadius - this.handleRadius; 
-        
-        // Ajout des éléments au Shadow DOM
-        this.shadowRoot.innerHTML = `
-            <style>
-                .base {
-                    width: 200px;
-                    height: 200px;
-                    border-radius: 50%;
-                    background: var(--ha-card-background, #d3d3d3); /* Cercle de base gris clair */
-                    position: relative;
-                    margin: 20px auto; /* Centrage dans la carte */
-                    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2); /* Effet d'enfoncement */
-                }
-                
-                .handle {
-                    width: 60px; /* 30% de 200px est environ 60px */
-                    height: 60px;
-                    border-radius: 50%;
-                    background: #f0f0f0; /* Blanc */
-                    position: absolute;
-                    top: 50%;
-                    left: 50%;
-                    transform: translate(-50%, -50%); /* Centrage parfait initial */
-                    cursor: grab;
-                    /* Effet "concave" ou 3D */
-                    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.5);
-                    transition: box-shadow 0.1s ease-in-out; /* Pour un feedback visuel */
-                }
-                
-                ha-card {
-                    padding: 16px;
-                    text-align: center;
-                }
-            </style>
-            <ha-card>
-                <div id="joystick-base" class="base">
-                    <div id="joystick-handle" class="handle"></div>
-                </div>
-            </ha-card>
-        `;
-        
-        // Références aux éléments
-        this.baseElement = this.shadowRoot.getElementById('joystick-base');
-        this.handleElement = this.shadowRoot.getElementById('joystick-handle');
         
         // Initialisation de la position
         this.x = 0;
         this.y = 0;
         
-        // Ajout des écouteurs d'événements pour le déplacement
+        // Le HTML/CSS ne va PAS dans le constructor, mais dans la méthode "render" de LitElement
+        // Nous retirons donc le this.attachShadow et this.shadowRoot.innerHTML ici.
+
+        // Nous laissons les EventListeners car ils ne dépendent pas du rendu initial de LitElement.
+        // this.addEventListeners(); // Nous devons déplacer cette fonction dans le "firstUpdated"
+    }
+
+    // --- NOUVELLE STRUCTURE DE CARTE (LitElement) ---
+
+    // 2. Définition des Styles (CSS)
+    static get styles() {
+        return css`
+            .base {
+                width: 200px;
+                height: 200px;
+                border-radius: 50%;
+                background: var(--ha-card-background, #d3d3d3);
+                position: relative;
+                margin: 20px auto;
+                box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+            }
+            .handle {
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                background: #f0f0f0;
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                cursor: grab;
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.5);
+                transition: box-shadow 0.1s ease-in-out;
+            }
+            /* Pas besoin de ha-card ici, elle est ajoutée par le render Lovelace */
+        `;
+    }
+
+    // 3. Définition du HTML (Rendu)
+    render() {
+        // Le HTML est retourné via la fonction `html` de lit.
+        // Les styles sont appliqués automatiquement par LitElement.
+        return html`
+            <div id="joystick-base" class="base">
+                <div 
+                    id="joystick-handle" 
+                    class="handle" 
+                    style="transform: translate(${this.x}px, ${this.y}px) translate(-50%, -50%);"
+                ></div>
+            </div>
+        `;
+    }
+    
+    // 4. setConfig : DOIT ÊTRE PRÉSENT ET FONCTIONNER
+    // C'est cette fonction que Lovelace recherche !
+    setConfig(config) {
+        this._config = config;
+        
+        // LitElement gère son propre rendu, donc pas besoin de manipuler le DOM ici.
+        // On force une mise à jour si besoin, mais ce n'est pas nécessaire pour setConfig.
+    }
+    
+    // 5. firstUpdated : Appelé après le premier rendu (une fois les éléments DOM prêts)
+    firstUpdated() {
+        // C'est ici que nous récupérons les références DOM et ajoutons les écouteurs.
+        this.baseElement = this.shadowRoot.getElementById('joystick-base');
+        this.handleElement = this.shadowRoot.getElementById('joystick-handle');
         this.addEventListeners();
     }
     
-    // ... (setConfig, set hass, getCardSize restent inchangés pour l'instant) ...
+    // *** La suite du code (addEventListeners, onStart, onEnd, onMove, updateHandlePosition, set hass, getCardSize)
+    // *** Reste en place, mais en s'assurant que `updateHandlePosition` utilise `this.handleElement`.
 
-    /**
-     * Ajoute les écouteurs d'événements pour les interactions tactiles/souris
-     */
-    addEventListeners() {
-        // Événement déclencheur (appui de souris ou début de toucher)
-        this.handleElement.addEventListener('mousedown', this.onStart.bind(this));
-        this.handleElement.addEventListener('touchstart', this.onStart.bind(this));
-        
-        // Événement de fin (relâchement de souris ou fin de toucher)
-        document.addEventListener('mouseup', this.onEnd.bind(this));
-        document.addEventListener('touchend', this.onEnd.bind(this));
-    }
-    
-    /**
-     * Démarrage du déplacement
-     */
-    onStart(e) {
-        e.preventDefault();
-        
-        // Marque le handle comme actif pour le déplacement
-        this.isDragging = true; 
-        this.handleElement.style.cursor = 'grabbing';
-        
-        // Ajout des écouteurs de mouvement seulement quand on drague
-        document.addEventListener('mousemove', this.onMove.bind(this));
-        document.addEventListener('touchmove', this.onMove.bind(this));
-    }
-    
-    /**
-     * Fin du déplacement
-     */
-    onEnd(e) {
-        if (!this.isDragging) return;
-        
-        this.isDragging = false;
-        this.handleElement.style.cursor = 'grab';
-        
-        // Suppression des écouteurs de mouvement
-        document.removeEventListener('mousemove', this.onMove.bind(this));
-        document.removeEventListener('touchmove', this.onMove.bind(this));
-        
-        // Retour du handle au centre de manière douce
-        this.handleElement.style.transition = 'transform 0.3s ease-out';
-        this.x = 0;
-        this.y = 0;
-        this.updateHandlePosition();
-        
-        // Optionnel: Envoyer la commande d'arrêt au Rover ici
-    }
-    
-    /**
-     * Déplacement du handle
-     */
-    onMove(e) {
-        if (!this.isDragging) return;
-        
-        // Réinitialisation de la transition pour un mouvement immédiat
-        this.handleElement.style.transition = 'none';
+    // ... (Le reste du code, y compris les fonctions onMove, onEnd, etc., doit être réinséré ici) ...
+    // Note : la fonction updateHandlePosition doit maintenant utiliser `this.requestUpdate()` après avoir changé `this.x` ou `this.y` pour forcer le `render()`.
 
-        // Gérer les coordonnées de l'événement (souris ou doigt)
-        const clientX = e.clientX || e.touches[0].clientX;
-        const clientY = e.clientY || e.touches[0].clientY;
-        
-        // Obtenir la position de la base
-        const baseRect = this.baseElement.getBoundingClientRect();
-        
-        // Calcul du centre de la base
-        const centerX = baseRect.left + this.baseRadius;
-        const centerY = baseRect.top + this.baseRadius;
-        
-        // Calcul de la distance relative (delta) par rapport au centre
-        let deltaX = clientX - centerX;
-        let deltaY = clientY - centerY;
-        
-        // Calcul de la distance totale (Pythagore : d = sqrt(x² + y²))
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-        
-        // --- Limitation du Mouvement ---
-        if (distance > this.maxDistance) {
-            // Si la distance est trop grande, nous recalculons les deltas pour les ramener à la limite
-            const angle = Math.atan2(deltaY, deltaX);
-            deltaX = this.maxDistance * Math.cos(angle);
-            deltaY = this.maxDistance * Math.sin(angle);
-        }
-
-        this.x = deltaX;
-        this.y = deltaY;
-
-        this.updateHandlePosition();
-        
-        // Optionnel: Envoyer la commande de mouvement au Rover ici
-    }
-    
-    /**
-     * Applique les coordonnées (x, y) au style de la bille
-     */
+    // ... (Pour simplifier, nous allons revenir à la méthode initiale de manipulation du style pour l'instant) ...
     updateHandlePosition() {
-        this.handleElement.style.transform = `translate(${this.x}px, ${this.y}px) translate(-50%, -50%)`;
-        
-        // Console pour vérifier les valeurs (à retirer en prod)
-        // console.log(`X: ${this.x.toFixed(1)}, Y: ${this.y.toFixed(1)}`);
+        if (this.handleElement) {
+             this.handleElement.style.transform = `translate(${this.x}px, ${this.y}px) translate(-50%, -50%)`;
+        }
     }
-
-    // ... (Le reste du code reste inchangé) ...
-
-    getCardSize() {
-        return 5; 
-    }
+    
+    // ... (Les autres fonctions onMove, onEnd, etc. sont insérées ici) ...
 }
 
+// L'enregistrement reste le même :
 customElements.define('joystick-rover-card', JoystickRoverCard);
