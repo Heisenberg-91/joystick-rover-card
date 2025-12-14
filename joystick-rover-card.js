@@ -1,89 +1,17 @@
 // =========================================================================
-// V1.0.7 - Solution Self-Contained (Intégration de Lit pour garantir l'exécution)
+// V1.0.8 - Revert à l'importation externe avec un CDN fiable (unpkg)
 // =========================================================================
 
-// --- 1. INTÉGRATION FORCÉE DES DÉPENDANCES (LIT-ELEMENT) ---
-// Ce code vient de la version minifiée de LitElement. Il doit être en tête.
-// Il crée les variables globales 'LitElement', 'html', et 'css'.
+// --- Importation critique : Utilisation de UNPKG (plus stable) ---
+import {
+    LitElement,
+    html,
+    css
+} from 'https://unpkg.com/lit@2.7.4/index.js?module'; 
 
-const $i = Symbol.for("lit-html-server-support");
-const o = (i) => i === null || "object" !== typeof i || !i.constructor.is;
-const t = (i, o) => {
-    let t = i.$lit$ = i.$lit$ || {};
-    return o !== void 0 && (t.C = o), t;
-};
-const l = (i, o) => t(i).C || o;
-const s = new WeakMap();
-const a = (i) => s.get(i);
-const c = (i) => {
-    i.l || (i.l = new Promise(((i) => (i) => {
-        i(o);
-    })(i)))
-};
-const u = new WeakMap();
-const h = (i) => u.get(i);
-const p = (i) => (u.set(i, null), (...o) => {
-    const t = o[0];
-    if ("object" === typeof t && null !== t && t.h && t.u && t.S) {
-        let o = a(i);
-        return o === void 0 && (o = {
-            element: i,
-            kind: "attribute",
-            index: -1,
-            name: "",
-            strings: t.u
-        }, s.set(i, o)), o;
-    }
-    const l = h(i);
-    return l === void 0 && (u.set(i, t), t.t = i), l || t;
-});
-const d = (i, o, t) => {
-    i.h = t, i.S = o
-};
+// --- DÉBUT DE LA CLASSE DE LA CARTE ---
 
-const g = (i, o) => {
-    if ("function" === typeof o && o.name === "render" && i.constructor.is) {
-        let t = i.constructor.prototype;
-        i.constructor.prototype = Object.create(t);
-        const l = Object.getOwnPropertyDescriptor(t, o.name);
-        i.constructor.prototype[o.name] = function(...t) {
-            var s;
-            const a = l.value.call(this, ...t);
-            return null !== (s = this.shadowRoot) && void 0 !== s || this.attachShadow({
-                mode: "open"
-            }), d(this.shadowRoot, a, this.render), a
-        }
-    }
-    return o
-};
-
-window.LitElement = function() {};
-window.LitElement.prototype = HTMLElement.prototype;
-
-window.html = function(i) {
-    let o = arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : [];
-    return {
-        h: html,
-        u: i,
-        S: o
-    };
-};
-
-window.css = function(i) {
-    return {
-        h: css,
-        u: i,
-        S: arguments.length > 1 && arguments[1] !== void 0 ? arguments[1] : []
-    };
-};
-
-// Maintenant, LitElement, html et css sont disponibles globalement comme prévu.
-
-// --- 2. DÉBUT DE LA CLASSE DE LA CARTE ---
-
-const { LitElement, html, css } = window;
-
-// Nous héritons de la classe globale LitElement injectée ci-dessus.
+// Nous héritons de la classe LitElement importée du CDN
 class JoystickRoverCard extends LitElement {
 
     // 1. Déclaration des propriétés
@@ -157,7 +85,7 @@ class JoystickRoverCard extends LitElement {
         `;
     }
     
-    // 5. setConfig
+    // 5. setConfig - utilise requestUpdate qui est maintenant défini par Lit importé
     setConfig(config) {
         this.config = config;
         this.requestUpdate(); 
@@ -171,8 +99,7 @@ class JoystickRoverCard extends LitElement {
         this.updateHandlePosition();
     }
 
-    // 7. Logique du Joystick (Inchagée)
-    
+    // 7. Logique du Joystick
     addEventListeners() {
         if (!this.handleElement) return;
 
@@ -220,7 +147,7 @@ class JoystickRoverCard extends LitElement {
         let deltaX = clientX - centerX;
         let deltaY = clientY - centerY;
         
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaX); // Correction : deltaY * deltaY
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY); 
         
         if (distance > this.maxDistance) {
             const angle = Math.atan2(deltaY, deltaX);
@@ -231,8 +158,6 @@ class JoystickRoverCard extends LitElement {
         this.x = deltaX;
         this.y = deltaY;
         this.updateHandlePosition();
-        
-        // La logique d'appel à Home Assistant sera ajoutée ici
     }
     
     updateHandlePosition() {
