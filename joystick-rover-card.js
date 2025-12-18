@@ -1,161 +1,197 @@
-// =========================================================================
-// V2.0.0 - Design Industriel : Soufflet Caoutchouc & Bouton Concave
-// =========================================================================
+// --- DÉFINITION DE LA CLASSE DE LA CARTE ---
+class JoystickRoverCard extends HTMLElement {
+  
+  // Cette fonction est appelée par Home Assistant pour configurer la carte
+  setConfig(config) {
+    if (!config.entity) {
+      throw new Error("Erreur : Vous devez spécifier une entité 'number' (ex: number.vitesse)");
+    }
+    this.config = config; // On stocke la configuration (nom de l'entité, etc.)
+  }
 
-import {
-    LitElement,
-    html,
-    css
-} from 'https://unpkg.com/lit@2.7.4/index.js?module'; 
+  // Cette fonction s'exécute quand la carte est affichée sur l'écran
+  connectedCallback() {
+    this._render();
+  }
 
-class JoystickRoverCard extends LitElement {
+  // Cette fonction reçoit les mises à jour de Home Assistant (état des capteurs, etc.)
+  set hass(hass) {
+    this._hass = hass;
+    this._updateValue(); // On met à jour le chiffre affiché sur la carte
+  }
 
-    static get properties() {
-        return {
-            config: { type: Object },
-            x: { type: Number },
-            y: { type: Number },
-        };
-    }
+  // --- PARTIE AFFICHAGE (HTML & CSS) ---
+  _render() {
+    if (this.shadowRoot) return; // Si la carte est déjà dessinée, on ne fait rien
+    this.attachShadow({ mode: 'open' }); // On crée un "Shadow DOM" pour isoler le style de la carte
 
-    constructor() {
-        super();
-        this.baseRadius = 80;    
-        this.handleRadius = 41;  
-        this.maxDistance = this.baseRadius - this.handleRadius; 
-        this.x = 0;
-        this.y = 0;
-        this.isDragging = false;
-        this._hass = null;
-    }
+    const style = document.createElement('style');
+    style.textContent = `
+      :host { display: block; padding: 10px; }
+      
+      /* Le rectangle qui contient tout le joystick */
+      .container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        background: #1c1c1c; /* Fond sombre industriel */
+        border-radius: 15px;
+        padding: 20px;
+        border: 2px solid #333;
+      }
 
-    setConfig(config) {
-        this.config = config;
-    }
+      /* La base circulaire noire (le trou dans lequel est le levier) */
+      .base {
+        position: relative;
+        width: 160px;
+        height: 160px;
+        background: #000;
+        border-radius: 50%;
+        border: 5px solid #222;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.9);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        touch-action: none; /* Empêche le téléphone de scroller quand on touche le joystick */
+      }
 
-    set hass(hass) {
-        this._hass = hass;
-    }
+      /* L'EFFET SOUFFLET (Les anneaux en caoutchouc) */
+      .soufflet {
+        position: absolute;
+        width: 110px;
+        height: 110px;
+        /* On crée des cercles concentriques pour imiter les plis du caoutchouc */
+        background: repeating-radial-gradient(circle, #2a2a2a 0%, #2a2a2a 8%, #111 12%);
+        border-radius: 50%;
+        transition: transform 0.1s ease-out; /* Fluidité du mouvement */
+        border: 1px solid #000;
+      }
 
-    static get styles() {
-        return css`
-            :host {
-                display: block;
-            }
-            ha-card {
-                background: none;
-                box-shadow: none;
-                border: none;
-            }
-            .card-content {
-                padding: 20px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-            }
-            /* DESIGN SOUFFLET (Base du Joystick) */
-            .base {
-                width: 160px; 
-                height: 160px;
-                border-radius: 50%;
-                position: relative;
-                border: 4px solid #222;
-                background: 
-                    /* Effet de texture anneaux concentriques (soufflet) */
-                    repeating-radial-gradient(
-                        circle at 50% 50%,
-                        #1a1a1a 0px,
-                        #1a1a1a 8px,
-                        #222222 10px,
-                        #0a0a0a 12px
-                    );
-                /* Ombre pour creuser la base dans la carte */
-                box-shadow: 
-                    inset 0 10px 30px rgba(0, 0, 0, 1.0),
-                    0 4px 10px rgba(0, 0, 0, 0.5);
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                touch-action: none;
-            }
-            /* DESIGN BOUTON CONCAVE (Le Handle) */
-            .handle {
-                width: 82px;
-                height: 82px;
-                border-radius: 50%;
-                position: absolute;
-                cursor: grab;
-                /* Dégradé radial pour l'effet de creux éclairé */
-                background: radial-gradient(circle at 50% 10%, #05c3ff 0%, #03a9f4 50%, #0288d1 100%);
-                /* Mix d'ombres externes pour le relief et internes pour la forme concave */
-                box-shadow: 
-                    0 15px 35px rgba(0, 0, 0, 0.8),         /* Ombre portée sur le soufflet */
-                    inset 0 12px 15px rgba(0, 0, 0, 0.5),    /* Creux supérieur */
-                    inset 0 -6px 10px rgba(255, 255, 255, 0.3); /* Reflet inférieur */
-                z-index: 10;
-                touch-action: none;
-                border: 1px solid rgba(0,0,0,0.3);
-            }
-            .handle:active {
-                cursor: grabbing;
-                box-shadow: 
-                    0 5px 15px rgba(0, 0, 0, 0.8),
-                    inset 0 18px 20px rgba(0, 0, 0, 0.6); /* Accentue l'enfoncement */
-            }
-        `;
-    }
+      /* LE POMMEAU (Le bouton que tu touches) */
+      .joystick {
+        position: relative;
+        width: 65px;
+        height: 65px;
+        /* Dégradé pour donner l'effet de volume CONCAVE (creux) */
+        background: radial-gradient(circle at 50% 50%, #333 0%, #555 100%);
+        border-radius: 50%;
+        box-shadow: 0 8px 15px rgba(0,0,0,0.6);
+        cursor: pointer;
+        z-index: 2;
+        border: 2px solid #444;
+      }
 
-    render() {
-        return html`
-            <ha-card .header=${this.config.title}>
-                <div class="card-content">
-                    <div id="joystick-base" class="base">
-                        <div 
-                            id="joystick-handle" 
-                            class="handle"
-                            style="transform: translate(${this.x}px, ${this.y}px);"
-                        ></div>
-                    </div>
-                </div>
-            </ha-card>
-        `;
-    }
-    
-    firstUpdated() {
-        this.baseElement = this.shadowRoot.querySelector('#joystick-base');
-        this.handleElement = this.shadowRoot.querySelector('#joystick-handle');
-        this.addEventListeners();
-    }
+      /* Petit reflet pour accentuer l'effet creux du bouton */
+      .joystick::after {
+        content: '';
+        position: absolute;
+        top: 20%; left: 20%; width: 60%; height: 60%;
+        background: radial-gradient(circle, rgba(0,0,0,0.3) 0%, transparent 70%);
+        border-radius: 50%;
+      }
 
-    addEventListeners() {
-        if (!this.handleElement) return;
-        
-        // Souris
-        this.handleElement.addEventListener('mousedown', this.onStart.bind(this));
-        document.addEventListener('mouseup', this.onEnd.bind(this));
-        document.addEventListener('mousemove', this.onMove.bind(this));
-        
-        // Tactile
-        this.handleElement.addEventListener('touchstart', this.onStart.bind(this), { passive: false });
-        document.addEventListener('touchend', this.onEnd.bind(this));
-        document.addEventListener('touchmove', this.onMove.bind(this), { passive: false });
+      /* Texte affichant la vitesse sous le joystick */
+      .value-display {
+        margin-top: 15px;
+        color: #00FF00; /* Vert style écran radar */
+        font-family: 'Courier New', monospace;
+        font-size: 1.1em;
+      }
+    `;
+
+    // --- STRUCTURE HTML DE LA CARTE ---
+    const container = document.createElement('div');
+    container.className = 'container';
+    container.innerHTML = `
+      <div class="base" id="base">
+        <div class="soufflet" id="soufflet"></div>
+        <div class="joystick" id="joystick"></div>
+      </div>
+      <div class="value-display">COMMAND_VITESSE: <span id="val">0</span></div>
+    `;
+
+    this.shadowRoot.appendChild(style);
+    this.shadowRoot.appendChild(container);
+
+    this._setupEventListeners(); // On active la détection du toucher/souris
+  }
+
+  // --- PARTIE LOGIQUE (MOUVEMENT ET CALCULS) ---
+  _setupEventListeners() {
+    const joystick = this.shadowRoot.getElementById('joystick');
+    const soufflet = this.shadowRoot.getElementById('soufflet');
+    const base = this.shadowRoot.getElementById('base');
+    let isDragging = false;
+
+    // Fonction qui calcule le mouvement
+    const move = (e) => {
+      if (!isDragging) return;
+
+      const rect = base.getBoundingClientRect();
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      // Position de la souris ou du doigt
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      
+      let x = clientX - rect.left - centerX;
+      let y = clientY - rect.top - centerY;
+
+      // Limiter le mouvement à l'intérieur de la base (Max 45 pixels)
+      const dist = Math.sqrt(x*x + y*y);
+      const maxDist = 45;
+      if (dist > maxDist) {
+        x *= maxDist / dist;
+        y *= maxDist / dist;
+      }
+
+      // Appliquer les transformations visuelles
+      joystick.style.transform = `translate(${x}px, ${y}px)`; // Le bouton bouge
+      // Le soufflet bouge à moitié de la vitesse pour simuler la déformation
+      soufflet.style.transform = `translate(${x/2}px, ${y/2}px) scale(${1 - dist/400})`; 
+      
+      // Conversion du mouvement Y en vitesse (-100 à 100)
+      const value = Math.round(-y * (100 / maxDist)); 
+      this._sendValue(value);
+    };
+
+    // Fonction quand on lâche le joystick (retour au centre)
+    const stop = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      joystick.style.transform = `translate(0px, 0px)`;
+      soufflet.style.transform = `translate(0px, 0px) scale(1)`;
+      this._sendValue(0); // On arrête le rover
+    };
+
+    // Événements Souris et Tactile
+    joystick.addEventListener('mousedown', () => isDragging = true);
+    window.addEventListener('mousemove', move);
+    window.addEventListener('mouseup', stop);
+    joystick.addEventListener('touchstart', () => isDragging = true);
+    window.addEventListener('touchmove', move);
+    window.addEventListener('touchend', stop);
+  }
+
+  // --- COMMUNICATION AVEC HOME ASSISTANT ---
+  _sendValue(value) {
+    // Appelle le service pour changer la valeur de l'entité ESPHome
+    this._hass.callService('number', 'set_value', {
+      entity_id: this.config.entity,
+      value: value
+    });
+  }
+
+  // Met à jour le texte affiché sous le joystick
+  _updateValue() {
+    const state = this._hass.states[this.config.entity];
+    const valSpan = this.shadowRoot.getElementById('val');
+    if (state && valSpan) {
+      valSpan.textContent = state.state;
     }
-    
-    onStart(e) {
-        e.preventDefault();
-        this.isDragging = true; 
-        this.handleElement.style.transition = 'none';
-    }
-    
-    onEnd(e) {
-        if (!this.isDragging) return;
-        this.isDragging = false;
-        // Retour doux au centre
-        this.handleElement.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-        this.x = 0;
-        this.y = 0;
-        this.sendCommands(0);
-    }
-    
-    onMove(e) {
-        if (!this.isDragging || !this.baseElement)
+  }
+}
+
+// Enregistrement final pour que HA reconnaisse la balise <joystick-rover-card>
+customElements.define('joystick-rover-card', JoystickRoverCard);
