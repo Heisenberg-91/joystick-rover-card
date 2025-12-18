@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.2.0 - Mixage Directionnel (Différentiel) pour Rover Heisenberg
+// V1.3.0 - Mode Propulsion Synchronisée + Direction par Servo
 // =========================================================================
 
 import {
@@ -51,7 +51,6 @@ class JoystickRoverCard extends LitElement {
                 transform: translate(-50%, -50%); 
                 cursor: grab;
                 box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.5);
-                transition: box-shadow 0.1s ease-in-out;
             }
             .card-content {
                 padding: 16px;
@@ -101,19 +100,17 @@ class JoystickRoverCard extends LitElement {
     onStart(e) {
         e.preventDefault();
         this.isDragging = true; 
-        this.handleElement.style.transition = 'none';
     }
     
     onEnd(e) {
         if (!this.isDragging) return;
         this.isDragging = false;
-        this.handleElement.style.transition = 'transform 0.3s ease-out';
         this.x = 0;
         this.y = 0;
         this.updateHandlePosition();
         
-        // Arrêt total des deux moteurs
-        this.sendMotorCommands(0, 0);
+        // Tout à zéro au relâchement
+        this.sendCommands(0, 0);
     }
     
     onMove(e) {
@@ -131,7 +128,6 @@ class JoystickRoverCard extends LitElement {
         let deltaY = clientY - centerY;
         
         const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY); 
-        
         if (distance > this.maxDistance) {
             const angle = Math.atan2(deltaY, deltaX);
             deltaX = this.maxDistance * Math.cos(angle);
@@ -142,20 +138,11 @@ class JoystickRoverCard extends LitElement {
         this.y = deltaY;
         this.updateHandlePosition();
 
-        // 1. Normalisation des valeurs (-100 à 100)
-        // Y inversé : pousser vers le haut = positif
-        const forward = (this.y / this.maxDistance) * -100;
-        const turn = (this.x / this.maxDistance) * 100;
+        // Calcul de la vitesse (Y) et de la direction (X)
+        const speed = Math.round((this.y / this.maxDistance) * -100);
+        const steering = Math.round((this.x / this.maxDistance) * 100);
 
-        // 2. Mixage Différentiel (Algorithme Arcade Drive)
-        let leftSpeed = forward + turn;
-        let rightSpeed = forward - turn;
-
-        // 3. Limitation entre -100 et 100
-        leftSpeed = Math.max(-100, Math.min(100, leftSpeed));
-        rightSpeed = Math.max(-100, Math.min(100, rightSpeed));
-
-        this.sendMotorCommands(Math.round(leftSpeed), Math.round(rightSpeed));
+        this.sendCommands(speed, steering);
     }
     
     updateHandlePosition() {
@@ -164,20 +151,24 @@ class JoystickRoverCard extends LitElement {
         }
     }
 
-    // Envoi simultané aux deux entités Number
-    sendMotorCommands(left, right) {
+    sendCommands(speed, steering) {
         if (!this._hass) return;
         
-        // Moteur Gauche
+        // On envoie la MÊME vitesse aux deux moteurs arrière
         this._hass.callService('number', 'set_value', {
             entity_id: 'number.vitesse_moteur_gauche',
-            value: left
+            value: speed
         });
         
-        // Moteur Droit
         this._hass.callService('number', 'set_value', {
             entity_id: 'number.vitesse_moteur_droit',
-            value: right
+            value: speed
+        });
+
+        // On envoie l'angle au servomoteur
+        this._hass.callService('number', 'set_value', {
+            entity_id: 'number.direction_rover', // Vérifie bien cet ID dans HA
+            value: steering
         });
     }
 
