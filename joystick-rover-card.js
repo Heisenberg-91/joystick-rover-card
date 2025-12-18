@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.6.9 - Heisenberg "Instant Feedback" Edition
+// V1.7.0 - Heisenberg "Instant Feedback" Edition
 // Pilotage double moteurs + Mise à jour d'affichage sans délai
 // =========================================================================
 
@@ -213,4 +213,5 @@ class JoystickRoverCard extends LitElement {
 }
 
 customElements.define('joystick-rover-card', JoystickRoverCard);
+
 
