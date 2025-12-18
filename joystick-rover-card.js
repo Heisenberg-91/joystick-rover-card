@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.3.0 - Mode Propulsion Synchronisée + Direction par Servo
+// V1.4.0 - Propulsion Précise : Zone morte 30% & Design Ajusté
 // =========================================================================
 
 import {
@@ -20,9 +20,11 @@ class JoystickRoverCard extends LitElement {
 
     constructor() {
         super();
-        this.baseRadius = 100;
-        this.handleRadius = 30;
-        this.maxDistance = this.baseRadius - this.handleRadius; 
+        // --- Dimensions ajustées (-20% sur la base, +20% sur la bille) ---
+        this.baseRadius = 80;    // Réduit de 100 à 80 (-20%)
+        this.handleRadius = 36;  // Augmenté de 30 à 36 (+20%)
+        this.maxDistance = this.baseRadius - 10; // Marge pour le mouvement
+        
         this.x = 0;
         this.y = 0;
         this.isDragging = false;
@@ -32,17 +34,18 @@ class JoystickRoverCard extends LitElement {
     static get styles() {
         return css`
             .base {
-                width: 200px;
-                height: 200px;
+                width: 160px; /* 80 * 2 */
+                height: 160px;
                 border-radius: 50%;
                 background: var(--ha-card-background, #d3d3d3);
                 position: relative;
                 margin: 20px auto;
                 box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.2);
+                border: 2px solid #555;
             }
             .handle {
-                width: 60px;
-                height: 60px;
+                width: 72px; /* 36 * 2 */
+                height: 72px;
                 border-radius: 50%;
                 background: #f0f0f0;
                 position: absolute;
@@ -50,7 +53,8 @@ class JoystickRoverCard extends LitElement {
                 left: 50%;
                 transform: translate(-50%, -50%); 
                 cursor: grab;
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3), inset 0 0 10px rgba(255, 255, 255, 0.5);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+                z-index: 10;
             }
             .card-content {
                 padding: 16px;
@@ -60,7 +64,7 @@ class JoystickRoverCard extends LitElement {
     }
 
     render() {
-        const title = this.config.title || "Rover Heisenberg";
+        const title = this.config.title || "Propulsion Rover";
         return html`
             <ha-card .header=${title}>
                 <div class="card-content">
@@ -108,9 +112,7 @@ class JoystickRoverCard extends LitElement {
         this.x = 0;
         this.y = 0;
         this.updateHandlePosition();
-        
-        // Tout à zéro au relâchement
-        this.sendCommands(0, 0);
+        this.sendCommands(0);
     }
     
     onMove(e) {
@@ -138,11 +140,21 @@ class JoystickRoverCard extends LitElement {
         this.y = deltaY;
         this.updateHandlePosition();
 
-        // Calcul de la vitesse (Y) et de la direction (X)
-        const speed = Math.round((this.y / this.maxDistance) * -100);
-        const steering = Math.round((this.x / this.maxDistance) * 100);
+        // --- Logique de Vitesse avec seuil 30% ---
+        let rawSpeed = (this.y / this.maxDistance) * -100;
+        let finalSpeed = 0;
 
-        this.sendCommands(speed, steering);
+        if (Math.abs(rawSpeed) > 5) { // Petite zone morte au centre (5%)
+            if (rawSpeed > 0) {
+                // Mapping : de 0-100% stick vers 30-100% moteur
+                finalSpeed = 30 + (rawSpeed * 0.7);
+            } else {
+                // Marche arrière : de 0 à -100% stick vers -30 à -100% moteur
+                finalSpeed = -30 + (rawSpeed * 0.7);
+            }
+        }
+
+        this.sendCommands(Math.round(finalSpeed));
     }
     
     updateHandlePosition() {
@@ -151,10 +163,9 @@ class JoystickRoverCard extends LitElement {
         }
     }
 
-    sendCommands(speed, steering) {
+    sendCommands(speed) {
         if (!this._hass) return;
         
-        // On envoie la MÊME vitesse aux deux moteurs arrière
         this._hass.callService('number', 'set_value', {
             entity_id: 'number.vitesse_moteur_gauche',
             value: speed
@@ -163,12 +174,6 @@ class JoystickRoverCard extends LitElement {
         this._hass.callService('number', 'set_value', {
             entity_id: 'number.vitesse_moteur_droit',
             value: speed
-        });
-
-        // On envoie l'angle au servomoteur
-        this._hass.callService('number', 'set_value', {
-            entity_id: 'number.direction_rover', // Vérifie bien cet ID dans HA
-            value: steering
         });
     }
 
