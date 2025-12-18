@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.4.0 - Propulsion Précise : Zone morte 30% & Design Ajusté
+// V1.5.0 - Propulsion Radiale, Contrainte de Bille & Alignement Gauche
 // =========================================================================
 
 import {
@@ -20,10 +20,10 @@ class JoystickRoverCard extends LitElement {
 
     constructor() {
         super();
-        // --- Dimensions ajustées (-20% sur la base, +20% sur la bille) ---
-        this.baseRadius = 80;    // Réduit de 100 à 80 (-20%)
-        this.handleRadius = 36;  // Augmenté de 30 à 36 (+20%)
-        this.maxDistance = this.baseRadius - 10; // Marge pour le mouvement
+        this.baseRadius = 80;    
+        this.handleRadius = 36;  
+        // La distance max est le rayon de la base MOINS le rayon de la bille
+        this.maxDistance = this.baseRadius - this.handleRadius; 
         
         this.x = 0;
         this.y = 0;
@@ -33,38 +33,41 @@ class JoystickRoverCard extends LitElement {
 
     static get styles() {
         return css`
+            .card-content {
+                padding: 16px;
+                display: flex;
+                justify-content: flex-start; /* Aligne le joystick à gauche */
+            }
             .base {
-                width: 160px; /* 80 * 2 */
+                width: 160px; /* baseRadius * 2 */
                 height: 160px;
                 border-radius: 50%;
                 background: var(--ha-card-background, #d3d3d3);
                 position: relative;
-                margin: 20px auto;
                 box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.2);
                 border: 2px solid #555;
             }
             .handle {
-                width: 72px; /* 36 * 2 */
+                width: 72px; /* handleRadius * 2 */
                 height: 72px;
                 border-radius: 50%;
                 background: #f0f0f0;
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                transform: translate(-50%, -50%); 
+                /* Le point d'ancrage est le centre de la bille */
+                margin-top: -36px;
+                margin-left: -36px;
                 cursor: grab;
                 box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
                 z-index: 10;
-            }
-            .card-content {
-                padding: 16px;
-                text-align: center;
+                touch-action: none;
             }
         `;
     }
 
     render() {
-        const title = this.config.title || "Propulsion Rover";
+        const title = this.config.title || "Contrôle Propulsion";
         return html`
             <ha-card .header=${title}>
                 <div class="card-content">
@@ -72,7 +75,7 @@ class JoystickRoverCard extends LitElement {
                         <div 
                             id="joystick-handle" 
                             class="handle"
-                            style="transform: translate(${this.x}px, ${this.y}px) translate(-50%, -50%);"
+                            style="transform: translate(${this.x}px, ${this.y}px);"
                         ></div>
                     </div>
                 </div>
@@ -104,14 +107,15 @@ class JoystickRoverCard extends LitElement {
     onStart(e) {
         e.preventDefault();
         this.isDragging = true; 
+        this.handleElement.style.transition = 'none';
     }
     
     onEnd(e) {
         if (!this.isDragging) return;
         this.isDragging = false;
+        this.handleElement.style.transition = 'transform 0.2s ease-out';
         this.x = 0;
         this.y = 0;
-        this.updateHandlePosition();
         this.sendCommands(0);
     }
     
@@ -129,7 +133,10 @@ class JoystickRoverCard extends LitElement {
         let deltaX = clientX - centerX;
         let deltaY = clientY - centerY;
         
+        // --- Calcul de la distance réelle ---
         const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY); 
+        
+        // --- Contrainte : La bille reste à l'intérieur ---
         if (distance > this.maxDistance) {
             const angle = Math.atan2(deltaY, deltaX);
             deltaX = this.maxDistance * Math.cos(angle);
@@ -138,39 +145,30 @@ class JoystickRoverCard extends LitElement {
 
         this.x = deltaX;
         this.y = deltaY;
-        this.updateHandlePosition();
 
-        // --- Logique de Vitesse avec seuil 30% ---
-        let rawSpeed = (this.y / this.maxDistance) * -100;
+        // --- Calcul de la vitesse basé sur la DISTANCE ---
+        // On normalise la distance de 0 à 100%
+        const normalizedDistance = (Math.sqrt(this.x**2 + this.y**2) / this.maxDistance) * 100;
+        
         let finalSpeed = 0;
 
-        if (Math.abs(rawSpeed) > 5) { // Petite zone morte au centre (5%)
-            if (rawSpeed > 0) {
-                // Mapping : de 0-100% stick vers 30-100% moteur
-                finalSpeed = 30 + (rawSpeed * 0.7);
-            } else {
-                // Marche arrière : de 0 à -100% stick vers -30 à -100% moteur
-                finalSpeed = -30 + (rawSpeed * 0.7);
-            }
+        if (normalizedDistance > 5) { // Zone morte de 5%
+            // Vitesse mini 35%, rampe de 65% (35 + 65 = 100)
+            finalSpeed = 35 + (normalizedDistance * 0.65);
+            
+            // Sens de marche : Si Y est en haut, positif. Si Y est en bas, négatif.
+            if (this.y > 0) finalSpeed = -finalSpeed; 
         }
 
         this.sendCommands(Math.round(finalSpeed));
     }
     
-    updateHandlePosition() {
-        if (this.handleElement) {
-             this.handleElement.style.transform = `translate(${this.x}px, ${this.y}px) translate(-50%, -50%)`;
-        }
-    }
-
     sendCommands(speed) {
         if (!this._hass) return;
-        
         this._hass.callService('number', 'set_value', {
             entity_id: 'number.vitesse_moteur_gauche',
             value: speed
         });
-        
         this._hass.callService('number', 'set_value', {
             entity_id: 'number.vitesse_moteur_droit',
             value: speed
