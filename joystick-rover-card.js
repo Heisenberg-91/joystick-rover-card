@@ -134,7 +134,7 @@ class JoystickRoverCard extends LitElement {
         // Pendant que l'on manipule le joystick, c'est le navigateur qui écrit la vitesse
         // pour que l'affichage sur la vidéo soit instantané (0ms de lag).
         if (this.isDragging || speedPerc === 0) {
-            const vitMax = 5.0; // Ta vitesse max configurée
+            const vitMax = 9.7; // Ta vitesse max configurée
             const kmh = Math.abs((speedPerc / 100) * vitMax).toFixed(1);
             
             this.hass.callService('input_number', 'set_value', {
@@ -157,3 +157,4 @@ class JoystickRoverCard extends LitElement {
     }
 }
 customElements.define('joystick-rover-card', JoystickRoverCard);
+
