@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.9.0 - Design Ultra-Concave Premium (Finition HA Blue)
+// V2.0.0 - Design Industriel : Soufflet Caoutchouc & Bouton Concave
 // =========================================================================
 
 import {
@@ -26,61 +26,88 @@ class JoystickRoverCard extends LitElement {
         this.x = 0;
         this.y = 0;
         this.isDragging = false;
+        this._hass = null;
     }
 
     setConfig(config) {
         this.config = config;
     }
 
+    set hass(hass) {
+        this._hass = hass;
+    }
+
     static get styles() {
         return css`
-            .card-content {
-                padding: 16px;
-                display: flex;
-                justify-content: flex-start;
+            :host {
+                display: block;
             }
+            ha-card {
+                background: none;
+                box-shadow: none;
+                border: none;
+            }
+            .card-content {
+                padding: 20px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            /* DESIGN SOUFFLET (Base du Joystick) */
             .base {
                 width: 160px; 
                 height: 160px;
                 border-radius: 50%;
-                /* Fond sombre profond avec ombre interne */
-                background: radial-gradient(circle, #252525 0%, #101010 100%);
                 position: relative;
-                box-shadow: inset 0 8px 15px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(255, 255, 255, 0.1);
-                border: 2px solid #333;
+                border: 4px solid #222;
+                background: 
+                    /* Effet de texture anneaux concentriques (soufflet) */
+                    repeating-radial-gradient(
+                        circle at 50% 50%,
+                        #1a1a1a 0px,
+                        #1a1a1a 8px,
+                        #222222 10px,
+                        #0a0a0a 12px
+                    );
+                /* Ombre pour creuser la base dans la carte */
+                box-shadow: 
+                    inset 0 10px 30px rgba(0, 0, 0, 1.0),
+                    0 4px 10px rgba(0, 0, 0, 0.5);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                touch-action: none;
             }
+            /* DESIGN BOUTON CONCAVE (Le Handle) */
             .handle {
                 width: 82px;
                 height: 82px;
                 border-radius: 50%;
-                /* Dégradé radial pour l'effet concave (ombre en haut, clair en bas) */
-                background: radial-gradient(circle at 50% 15%, #0288d1 0%, #03a9f4 60%, #05c3ff 100%);
                 position: absolute;
-                top: 50%;
-                left: 50%;
-                margin-top: -41px;
-                margin-left: -41px;
                 cursor: grab;
-                /* Multiples ombres pour le relief */
+                /* Dégradé radial pour l'effet de creux éclairé */
+                background: radial-gradient(circle at 50% 10%, #05c3ff 0%, #03a9f4 50%, #0288d1 100%);
+                /* Mix d'ombres externes pour le relief et internes pour la forme concave */
                 box-shadow: 
-                    0 10px 20px rgba(0,0,0,0.5),      /* Ombre portée */
-                    inset 0 12px 12px rgba(0,0,0,0.4),  /* Creux haut */
-                    inset 0 -5px 8px rgba(255,255,255,0.3); /* Bord brillant bas */
+                    0 15px 35px rgba(0, 0, 0, 0.8),         /* Ombre portée sur le soufflet */
+                    inset 0 12px 15px rgba(0, 0, 0, 0.5),    /* Creux supérieur */
+                    inset 0 -6px 10px rgba(255, 255, 255, 0.3); /* Reflet inférieur */
                 z-index: 10;
                 touch-action: none;
+                border: 1px solid rgba(0,0,0,0.3);
             }
             .handle:active {
-                /* Accentue l'enfoncement quand on touche */
+                cursor: grabbing;
                 box-shadow: 
-                    0 5px 10px rgba(0,0,0,0.5), 
-                    inset 0 15px 15px rgba(0,0,0,0.6);
+                    0 5px 15px rgba(0, 0, 0, 0.8),
+                    inset 0 18px 20px rgba(0, 0, 0, 0.6); /* Accentue l'enfoncement */
             }
         `;
     }
 
     render() {
         return html`
-            <ha-card .header=${this.config.title || "Contrôle Rover"}>
+            <ha-card .header=${this.config.title}>
                 <div class="card-content">
                     <div id="joystick-base" class="base">
                         <div 
@@ -102,11 +129,15 @@ class JoystickRoverCard extends LitElement {
 
     addEventListeners() {
         if (!this.handleElement) return;
+        
+        // Souris
         this.handleElement.addEventListener('mousedown', this.onStart.bind(this));
-        this.handleElement.addEventListener('touchstart', this.onStart.bind(this), { passive: false });
         document.addEventListener('mouseup', this.onEnd.bind(this));
-        document.addEventListener('touchend', this.onEnd.bind(this));
         document.addEventListener('mousemove', this.onMove.bind(this));
+        
+        // Tactile
+        this.handleElement.addEventListener('touchstart', this.onStart.bind(this), { passive: false });
+        document.addEventListener('touchend', this.onEnd.bind(this));
         document.addEventListener('touchmove', this.onMove.bind(this), { passive: false });
     }
     
@@ -119,62 +150,12 @@ class JoystickRoverCard extends LitElement {
     onEnd(e) {
         if (!this.isDragging) return;
         this.isDragging = false;
-        this.handleElement.style.transition = 'transform 0.2s ease-out';
+        // Retour doux au centre
+        this.handleElement.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
         this.x = 0;
         this.y = 0;
         this.sendCommands(0);
     }
     
     onMove(e) {
-        if (!this.isDragging || !this.baseElement) return;
-        
-        const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-        const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
-        
-        const baseRect = this.baseElement.getBoundingClientRect();
-        const centerX = baseRect.left + this.baseRadius;
-        const centerY = baseRect.top + this.baseRadius;
-        
-        let deltaX = clientX - centerX;
-        let deltaY = clientY - centerY;
-        
-        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY); 
-        
-        if (distance > this.maxDistance) {
-            const angle = Math.atan2(deltaY, deltaX);
-            deltaX = this.maxDistance * Math.cos(angle);
-            deltaY = this.maxDistance * Math.sin(angle);
-        }
-
-        this.x = deltaX;
-        this.y = deltaY;
-
-        const normalizedDistance = (Math.sqrt(this.x**2 + this.y**2) / this.maxDistance) * 100;
-        let finalSpeed = 0;
-
-        if (normalizedDistance > 5) {
-            finalSpeed = 35 + (normalizedDistance * 0.65);
-            if (this.y > 0) finalSpeed = -finalSpeed; 
-        }
-
-        this.sendCommands(Math.round(finalSpeed));
-    }
-    
-    sendCommands(speed) {
-        if (!this._hass) return;
-        this._hass.callService('number', 'set_value', {
-            entity_id: 'number.vitesse_moteur_gauche',
-            value: speed
-        });
-        this._hass.callService('number', 'set_value', {
-            entity_id: 'number.vitesse_moteur_droit',
-            value: speed
-        });
-    }
-
-    set hass(hass) {
-        this._hass = hass;
-    }
-}
-
-customElements.define('joystick-rover-card', JoystickRoverCard);
+        if (!this.isDragging || !this.baseElement)
