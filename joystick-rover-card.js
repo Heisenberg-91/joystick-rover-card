@@ -187,7 +187,7 @@ class JoystickRoverCard extends LitElement {
 
         // 1. MISE À JOUR DE L'AFFICHAGE (Instantané sur la carte vidéo)
         this.hass.callService('input_number', 'set_value', {
-            entity_id: 'input_number.vitesse_instantanee',
+            entity_id: 'input_number.vitesse_rover',
             value: speedPerc
         });
 
@@ -213,3 +213,4 @@ class JoystickRoverCard extends LitElement {
 }
 
 customElements.define('joystick-rover-card', JoystickRoverCard);
+
