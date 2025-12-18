@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.1.0 - Intégration Rover ESP32-S3 (Contrôle via entité Number)
+// V1.2.0 - Mixage Directionnel (Différentiel) pour Rover Heisenberg
 // =========================================================================
 
 import {
@@ -38,7 +38,7 @@ class JoystickRoverCard extends LitElement {
                 background: var(--ha-card-background, #d3d3d3);
                 position: relative;
                 margin: 20px auto;
-                box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+                box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.2);
             }
             .handle {
                 width: 60px;
@@ -112,8 +112,8 @@ class JoystickRoverCard extends LitElement {
         this.y = 0;
         this.updateHandlePosition();
         
-        // Arrêt du moteur à la relâche
-        this.sendMotorCommand(0);
+        // Arrêt total des deux moteurs
+        this.sendMotorCommands(0, 0);
     }
     
     onMove(e) {
@@ -142,12 +142,20 @@ class JoystickRoverCard extends LitElement {
         this.y = deltaY;
         this.updateHandlePosition();
 
-        // Calcul de la puissance moteur (-100 à 100)
-        // Note: Y est inversé dans le navigateur (le haut est négatif)
-        const speed = Math.round((this.y / this.maxDistance) * -100);
-        
-        // On n'envoie la commande que si nécessaire (limite le trafic)
-        this.sendMotorCommand(speed);
+        // 1. Normalisation des valeurs (-100 à 100)
+        // Y inversé : pousser vers le haut = positif
+        const forward = (this.y / this.maxDistance) * -100;
+        const turn = (this.x / this.maxDistance) * 100;
+
+        // 2. Mixage Différentiel (Algorithme Arcade Drive)
+        let leftSpeed = forward + turn;
+        let rightSpeed = forward - turn;
+
+        // 3. Limitation entre -100 et 100
+        leftSpeed = Math.max(-100, Math.min(100, leftSpeed));
+        rightSpeed = Math.max(-100, Math.min(100, rightSpeed));
+
+        this.sendMotorCommands(Math.round(leftSpeed), Math.round(rightSpeed));
     }
     
     updateHandlePosition() {
@@ -156,22 +164,25 @@ class JoystickRoverCard extends LitElement {
         }
     }
 
-    // Communication avec l'ESP32 via Home Assistant
-    sendMotorCommand(value) {
+    // Envoi simultané aux deux entités Number
+    sendMotorCommands(left, right) {
         if (!this._hass) return;
         
+        // Moteur Gauche
         this._hass.callService('number', 'set_value', {
             entity_id: 'number.vitesse_moteur_gauche',
-            value: value
+            value: left
+        });
+        
+        // Moteur Droit
+        this._hass.callService('number', 'set_value', {
+            entity_id: 'number.vitesse_moteur_droit',
+            value: right
         });
     }
 
     set hass(hass) {
         this._hass = hass;
-    }
-    
-    getCardSize() {
-        return 5; 
     }
 }
 
