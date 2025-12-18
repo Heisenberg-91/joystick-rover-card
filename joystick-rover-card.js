@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.5.0 - Propulsion Radiale, Contrainte de Bille & Alignement Gauche
+// V1.6.0 - Design Premium : Bille Concave HA Blue, Cercle Sombre & +15% Size
 // =========================================================================
 
 import {
@@ -21,8 +21,8 @@ class JoystickRoverCard extends LitElement {
     constructor() {
         super();
         this.baseRadius = 80;    
-        this.handleRadius = 36;  
-        // La distance max est le rayon de la base MOINS le rayon de la bille
+        // Augmentation de 15% : 36 * 1.15 = 41.4 -> arrondi à 41
+        this.handleRadius = 41;  
         this.maxDistance = this.baseRadius - this.handleRadius; 
         
         this.x = 0;
@@ -36,38 +36,51 @@ class JoystickRoverCard extends LitElement {
             .card-content {
                 padding: 16px;
                 display: flex;
-                justify-content: flex-start; /* Aligne le joystick à gauche */
+                justify-content: flex-start;
             }
             .base {
-                width: 160px; /* baseRadius * 2 */
+                width: 160px; 
                 height: 160px;
                 border-radius: 50%;
-                background: var(--ha-card-background, #d3d3d3);
+                /* Intérieur du cercle assombri avec dégradé subtil */
+                background: radial-gradient(circle, #2c2c2c 0%, #1a1a1a 100%);
                 position: relative;
-                box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.2);
-                border: 2px solid #555;
+                box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(255, 255, 255, 0.1);
+                border: 2px solid #444;
             }
             .handle {
-                width: 72px; /* handleRadius * 2 */
-                height: 72px;
+                width: 82px; /* handleRadius * 2 */
+                height: 82px;
                 border-radius: 50%;
-                background: #f0f0f0;
+                /* Bleu Home Assistant */
+                background: #03a9f4;
                 position: absolute;
                 top: 50%;
                 left: 50%;
-                /* Le point d'ancrage est le centre de la bille */
-                margin-top: -36px;
-                margin-left: -36px;
+                margin-top: -41px;
+                margin-left: -41px;
                 cursor: grab;
-                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+                /* Effet Concave : Ombre portée + ombre interne inversée */
+                box-shadow: 
+                    0 4px 8px rgba(0, 0, 0, 0.4), 
+                    inset 0 -4px 6px rgba(0, 0, 0, 0.3),
+                    inset 0 4px 6px rgba(255, 255, 255, 0.3);
                 z-index: 10;
                 touch-action: none;
+                transition: box-shadow 0.2s;
+            }
+            .handle:active {
+                /* Accentuation de l'effet concave à l'appui */
+                box-shadow: 
+                    0 2px 4px rgba(0, 0, 0, 0.4), 
+                    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
+                    inset 0 2px 8px rgba(0, 0, 0, 0.5);
             }
         `;
     }
 
     render() {
-        const title = this.config.title || "Contrôle Propulsion";
+        const title = this.config.title || "Rover Command";
         return html`
             <ha-card .header=${title}>
                 <div class="card-content">
@@ -83,10 +96,7 @@ class JoystickRoverCard extends LitElement {
         `;
     }
     
-    setConfig(config) {
-        this.config = config;
-        this.requestUpdate(); 
-    }
+    // ... (Le reste de la logique firstUpdated, onStart, onEnd, onMove est identique à la v1.5.0) ...
     
     firstUpdated() {
         this.baseElement = this.shadowRoot.querySelector('#joystick-base');
@@ -133,10 +143,8 @@ class JoystickRoverCard extends LitElement {
         let deltaX = clientX - centerX;
         let deltaY = clientY - centerY;
         
-        // --- Calcul de la distance réelle ---
         const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY); 
         
-        // --- Contrainte : La bille reste à l'intérieur ---
         if (distance > this.maxDistance) {
             const angle = Math.atan2(deltaY, deltaX);
             deltaX = this.maxDistance * Math.cos(angle);
@@ -146,17 +154,11 @@ class JoystickRoverCard extends LitElement {
         this.x = deltaX;
         this.y = deltaY;
 
-        // --- Calcul de la vitesse basé sur la DISTANCE ---
-        // On normalise la distance de 0 à 100%
         const normalizedDistance = (Math.sqrt(this.x**2 + this.y**2) / this.maxDistance) * 100;
-        
         let finalSpeed = 0;
 
-        if (normalizedDistance > 5) { // Zone morte de 5%
-            // Vitesse mini 35%, rampe de 65% (35 + 65 = 100)
+        if (normalizedDistance > 5) {
             finalSpeed = 35 + (normalizedDistance * 0.65);
-            
-            // Sens de marche : Si Y est en haut, positif. Si Y est en bas, négatif.
             if (this.y > 0) finalSpeed = -finalSpeed; 
         }
 
