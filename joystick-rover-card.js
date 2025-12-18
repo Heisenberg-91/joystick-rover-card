@@ -1,20 +1,15 @@
 // =========================================================================
-// V1.0.8 - Revert à l'importation externe avec un CDN fiable (unpkg)
+// V1.1.0 - Intégration Rover ESP32-S3 (Contrôle via entité Number)
 // =========================================================================
 
-// --- Importation critique : Utilisation de UNPKG (plus stable) ---
 import {
     LitElement,
     html,
     css
 } from 'https://unpkg.com/lit@2.7.4/index.js?module'; 
 
-// --- DÉBUT DE LA CLASSE DE LA CARTE ---
-
-// Nous héritons de la classe LitElement importée du CDN
 class JoystickRoverCard extends LitElement {
 
-    // 1. Déclaration des propriétés
     static get properties() {
         return {
             config: { type: Object },
@@ -23,7 +18,6 @@ class JoystickRoverCard extends LitElement {
         };
     }
 
-    // 2. Initialisation
     constructor() {
         super();
         this.baseRadius = 100;
@@ -35,7 +29,6 @@ class JoystickRoverCard extends LitElement {
         this.config = {};
     }
 
-    // 3. Définition des Styles (CSS)
     static get styles() {
         return css`
             .base {
@@ -62,14 +55,13 @@ class JoystickRoverCard extends LitElement {
             }
             .card-content {
                 padding: 16px;
+                text-align: center;
             }
         `;
     }
 
-    // 4. Définition du HTML (Rendu)
     render() {
-        const title = this.config.title || "Rover Controller";
-        
+        const title = this.config.title || "Rover Heisenberg";
         return html`
             <ha-card .header=${title}>
                 <div class="card-content">
@@ -85,27 +77,21 @@ class JoystickRoverCard extends LitElement {
         `;
     }
     
-    // 5. setConfig - utilise requestUpdate qui est maintenant défini par Lit importé
     setConfig(config) {
         this.config = config;
         this.requestUpdate(); 
     }
     
-    // 6. firstUpdated (appelé quand le DOM est prêt)
     firstUpdated() {
         this.baseElement = this.shadowRoot.querySelector('#joystick-base');
         this.handleElement = this.shadowRoot.querySelector('#joystick-handle');
         this.addEventListeners();
-        this.updateHandlePosition();
     }
 
-    // 7. Logique du Joystick
     addEventListeners() {
         if (!this.handleElement) return;
-
         this.handleElement.addEventListener('mousedown', this.onStart.bind(this));
         this.handleElement.addEventListener('touchstart', this.onStart.bind(this));
-        
         document.addEventListener('mouseup', this.onEnd.bind(this));
         document.addEventListener('touchend', this.onEnd.bind(this));
         document.addEventListener('mousemove', this.onMove.bind(this));
@@ -115,30 +101,27 @@ class JoystickRoverCard extends LitElement {
     onStart(e) {
         e.preventDefault();
         this.isDragging = true; 
-        this.handleElement.style.cursor = 'grabbing';
         this.handleElement.style.transition = 'none';
-        e.stopPropagation(); 
     }
     
     onEnd(e) {
         if (!this.isDragging) return;
-        
         this.isDragging = false;
-        this.handleElement.style.cursor = 'grab';
-        
         this.handleElement.style.transition = 'transform 0.3s ease-out';
         this.x = 0;
         this.y = 0;
-        this.updateHandlePosition(); 
+        this.updateHandlePosition();
+        
+        // Arrêt du moteur à la relâche
+        this.sendMotorCommand(0);
     }
     
     onMove(e) {
         if (!this.isDragging || !this.baseElement) return;
-        
         e.preventDefault();
         
-        const clientX = e.clientX || e.touches[0].clientX;
-        const clientY = e.clientY || e.touches[0].clientY;
+        const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
+        const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
         
         const baseRect = this.baseElement.getBoundingClientRect();
         const centerX = baseRect.left + this.baseRadius;
@@ -158,6 +141,13 @@ class JoystickRoverCard extends LitElement {
         this.x = deltaX;
         this.y = deltaY;
         this.updateHandlePosition();
+
+        // Calcul de la puissance moteur (-100 à 100)
+        // Note: Y est inversé dans le navigateur (le haut est négatif)
+        const speed = Math.round((this.y / this.maxDistance) * -100);
+        
+        // On n'envoie la commande que si nécessaire (limite le trafic)
+        this.sendMotorCommand(speed);
     }
     
     updateHandlePosition() {
@@ -166,13 +156,22 @@ class JoystickRoverCard extends LitElement {
         }
     }
 
-    // Fonctions Lovelace
+    // Communication avec l'ESP32 via Home Assistant
+    sendMotorCommand(value) {
+        if (!this._hass) return;
+        
+        this._hass.callService('number', 'set_value', {
+            entity_id: 'number.vitesse_moteur_gauche',
+            value: value
+        });
+    }
+
     set hass(hass) {
         this._hass = hass;
     }
     
     getCardSize() {
-        return 5; 
+        return 5; 
     }
 }
 
