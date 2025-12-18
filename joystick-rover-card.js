@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.6.0 - Design Premium : Bille Concave HA Blue, Cercle Sombre & +15% Size
+// V1.6.1 - FIX: setConfig + Design Premium (HA Blue, Concave, Sombre)
 // =========================================================================
 
 import {
@@ -21,14 +21,18 @@ class JoystickRoverCard extends LitElement {
     constructor() {
         super();
         this.baseRadius = 80;    
-        // Augmentation de 15% : 36 * 1.15 = 41.4 -> arrondi à 41
-        this.handleRadius = 41;  
+        this.handleRadius = 41;  // +15% de taille
         this.maxDistance = this.baseRadius - this.handleRadius; 
         
         this.x = 0;
         this.y = 0;
         this.isDragging = false;
         this.config = {};
+    }
+
+    // --- Configuration requise par Home Assistant ---
+    setConfig(config) {
+        this.config = config;
     }
 
     static get styles() {
@@ -42,35 +46,31 @@ class JoystickRoverCard extends LitElement {
                 width: 160px; 
                 height: 160px;
                 border-radius: 50%;
-                /* Intérieur du cercle assombri avec dégradé subtil */
                 background: radial-gradient(circle, #2c2c2c 0%, #1a1a1a 100%);
                 position: relative;
                 box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(255, 255, 255, 0.1);
                 border: 2px solid #444;
             }
             .handle {
-                width: 82px; /* handleRadius * 2 */
+                width: 82px;
                 height: 82px;
                 border-radius: 50%;
-                /* Bleu Home Assistant */
-                background: #03a9f4;
+                background: #03a9f4; /* Bleu Home Assistant */
                 position: absolute;
                 top: 50%;
                 left: 50%;
                 margin-top: -41px;
                 margin-left: -41px;
                 cursor: grab;
-                /* Effet Concave : Ombre portée + ombre interne inversée */
+                /* Effet Concave */
                 box-shadow: 
                     0 4px 8px rgba(0, 0, 0, 0.4), 
                     inset 0 -4px 6px rgba(0, 0, 0, 0.3),
                     inset 0 4px 6px rgba(255, 255, 255, 0.3);
                 z-index: 10;
                 touch-action: none;
-                transition: box-shadow 0.2s;
             }
             .handle:active {
-                /* Accentuation de l'effet concave à l'appui */
                 box-shadow: 
                     0 2px 4px rgba(0, 0, 0, 0.4), 
                     inset 0 -2px 4px rgba(0, 0, 0, 0.3),
@@ -80,9 +80,8 @@ class JoystickRoverCard extends LitElement {
     }
 
     render() {
-        const title = this.config.title || "Rover Command";
         return html`
-            <ha-card .header=${title}>
+            <ha-card .header=${this.config.title || "Rover Command"}>
                 <div class="card-content">
                     <div id="joystick-base" class="base">
                         <div 
@@ -95,8 +94,6 @@ class JoystickRoverCard extends LitElement {
             </ha-card>
         `;
     }
-    
-    // ... (Le reste de la logique firstUpdated, onStart, onEnd, onMove est identique à la v1.5.0) ...
     
     firstUpdated() {
         this.baseElement = this.shadowRoot.querySelector('#joystick-base');
