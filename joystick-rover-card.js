@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.6.1 - FIX: setConfig + Design Premium (HA Blue, Concave, Sombre)
+// V1.9.0 - Design Ultra-Concave Premium (Finition HA Blue)
 // =========================================================================
 
 import {
@@ -21,16 +21,13 @@ class JoystickRoverCard extends LitElement {
     constructor() {
         super();
         this.baseRadius = 80;    
-        this.handleRadius = 41;  // +15% de taille
+        this.handleRadius = 41;  
         this.maxDistance = this.baseRadius - this.handleRadius; 
-        
         this.x = 0;
         this.y = 0;
         this.isDragging = false;
-        this.config = {};
     }
 
-    // --- Configuration requise par Home Assistant ---
     setConfig(config) {
         this.config = config;
     }
@@ -46,42 +43,44 @@ class JoystickRoverCard extends LitElement {
                 width: 160px; 
                 height: 160px;
                 border-radius: 50%;
-                background: radial-gradient(circle, #2c2c2c 0%, #1a1a1a 100%);
+                /* Fond sombre profond avec ombre interne */
+                background: radial-gradient(circle, #252525 0%, #101010 100%);
                 position: relative;
-                box-shadow: inset 0 4px 10px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(255, 255, 255, 0.1);
-                border: 2px solid #444;
+                box-shadow: inset 0 8px 15px rgba(0, 0, 0, 0.7), 0 1px 2px rgba(255, 255, 255, 0.1);
+                border: 2px solid #333;
             }
             .handle {
                 width: 82px;
                 height: 82px;
                 border-radius: 50%;
-                background: #03a9f4; /* Bleu Home Assistant */
+                /* Dégradé radial pour l'effet concave (ombre en haut, clair en bas) */
+                background: radial-gradient(circle at 50% 15%, #0288d1 0%, #03a9f4 60%, #05c3ff 100%);
                 position: absolute;
                 top: 50%;
                 left: 50%;
                 margin-top: -41px;
                 margin-left: -41px;
                 cursor: grab;
-                /* Effet Concave */
+                /* Multiples ombres pour le relief */
                 box-shadow: 
-                    0 4px 8px rgba(0, 0, 0, 0.4), 
-                    inset 0 -4px 6px rgba(0, 0, 0, 0.3),
-                    inset 0 4px 6px rgba(255, 255, 255, 0.3);
+                    0 10px 20px rgba(0,0,0,0.5),      /* Ombre portée */
+                    inset 0 12px 12px rgba(0,0,0,0.4),  /* Creux haut */
+                    inset 0 -5px 8px rgba(255,255,255,0.3); /* Bord brillant bas */
                 z-index: 10;
                 touch-action: none;
             }
             .handle:active {
+                /* Accentue l'enfoncement quand on touche */
                 box-shadow: 
-                    0 2px 4px rgba(0, 0, 0, 0.4), 
-                    inset 0 -2px 4px rgba(0, 0, 0, 0.3),
-                    inset 0 2px 8px rgba(0, 0, 0, 0.5);
+                    0 5px 10px rgba(0,0,0,0.5), 
+                    inset 0 15px 15px rgba(0,0,0,0.6);
             }
         `;
     }
 
     render() {
         return html`
-            <ha-card .header=${this.config.title || "Rover Command"}>
+            <ha-card .header=${this.config.title || "Contrôle Rover"}>
                 <div class="card-content">
                     <div id="joystick-base" class="base">
                         <div 
@@ -104,7 +103,7 @@ class JoystickRoverCard extends LitElement {
     addEventListeners() {
         if (!this.handleElement) return;
         this.handleElement.addEventListener('mousedown', this.onStart.bind(this));
-        this.handleElement.addEventListener('touchstart', this.onStart.bind(this));
+        this.handleElement.addEventListener('touchstart', this.onStart.bind(this), { passive: false });
         document.addEventListener('mouseup', this.onEnd.bind(this));
         document.addEventListener('touchend', this.onEnd.bind(this));
         document.addEventListener('mousemove', this.onMove.bind(this));
@@ -128,7 +127,6 @@ class JoystickRoverCard extends LitElement {
     
     onMove(e) {
         if (!this.isDragging || !this.baseElement) return;
-        e.preventDefault();
         
         const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
         const clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
