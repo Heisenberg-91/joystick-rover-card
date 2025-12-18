@@ -130,34 +130,28 @@ class JoystickRoverCard extends LitElement {
     sendCommands(speedPerc) {
         if (!this.hass) return;
 
-        // --- MÉTHODE HYBRIDE RÉGLÉE (Correction Prioritaire) ---
-        // On n'envoie la vitesse simulée que si on vient de bouger le stick 
-        // ou si on est à l'arrêt, pour laisser l'ESP32 piloter le reste du temps.
-        if (speedPerc === 0) {
-            this.hass.callService('input_number', 'set_value', {
-                entity_id: 'input_number.vitesse_rover',
-                value: 0
-            });
-        } 
-        // On ne simule la vitesse que pendant les 500 premières ms du mouvement
-        // ensuite on laisse le capteur réel (ESP) afficher la vérité.
-        else if (this.isDragging && (Date.now() - this.lastSend > 500)) {
-            // Optionnel : tu peux commenter cette partie pour ne voir QUE le capteur réel
-            // mais tu retrouveras un petit lag au démarrage.
-        }
-
-        // --- COMMANDE MOTEUR (Toujours active) ---
+        // --- PUISSANCE MOTEURS ---
         let pwr = 0;
         if (Math.abs(speedPerc) > 5) {
             pwr = 35 + (Math.abs(speedPerc) * 0.65);
             if (speedPerc < 0) pwr = -pwr;
         }
         const val = Math.round(pwr);
-        ['number.vitesse_moteur_gauche', 'number.vitesse_moteur_droit'].forEach(ent => {
-            this.hass.callService('number', 'set_value', { entity_id: ent, value: val });
+
+        // On envoie uniquement l'ordre aux moteurs
+        const entities = ['number.vitesse_moteur_gauche', 'number.vitesse_moteur_droit'];
+        entities.forEach(ent => {
+            this.hass.callService('number', 'set_value', {
+                entity_id: ent,
+                value: val
+            });
         });
+
+        // NOTE : On ne touche plus à input_number.vitesse_rover ici.
+        // C'est l'ESP32 qui s'en occupe maintenant.
     }
 }
 customElements.define('joystick-rover-card', JoystickRoverCard);
+
 
 
