@@ -1,4 +1,5 @@
-// On importe les outils de Home Assistant (LitElement)
+// --- IMPORTATION DES OUTILS ---
+// On récupère LitElement qui permet de créer des composants fluides pour Home Assistant
 import {
     LitElement,
     html,
@@ -8,55 +9,52 @@ import {
 class JoystickRoverCard extends LitElement {
     
     // --- CONFIGURATION ---
-    // Cette fonction reçoit les réglages que tu écris dans ton tableau de bord YAML
+    // Cette fonction reçoit les paramètres YAML de ton tableau de bord
     setConfig(config) {
         this.config = config;
     }
 
-    // On définit les propriétés qui vont changer et forcer la carte à se redessiner
+    // On déclare les propriétés qui changent (X et Y pour la position du bouton)
     static get properties() {
         return {
-            hass: { type: Object },         // Connexion à Home Assistant
-            config: { type: Object },       // Ta config YAML
-            x: { type: Number },            // Position horizontale du bouton
-            y: { type: Number },            // Position verticale du bouton
-            displaySpeed: { type: Number }  // Vitesse affichée à l'écran (pour éviter le lag)
+            hass: { type: Object },
+            config: { type: Object },
+            x: { type: Number },
+            y: { type: Number }
         };
     }
 
+    // --- INITIALISATION ---
     constructor() {
         super();
-        this.baseRadius = 80;       // Taille de la base noire
-        this.handleRadius = 41;     // Taille du bouton bleu
+        this.baseRadius = 80;       // Rayon de la base noire (160px / 2)
+        this.handleRadius = 41;     // Rayon du bouton bleu (82px / 2)
         this.maxDistance = this.baseRadius - this.handleRadius; // Limite de mouvement
         this.x = 0;
         this.y = 0;
-        this.displaySpeed = 0;
-        this.isDragging = false;
-        this.lastSend = 0;          // Chronomètre pour ne pas saturer l'ESP32
+        this.isDragging = false;    // Indique si l'utilisateur est en train de toucher le joystick
+        this.lastSend = 0;          // Chronomètre pour éviter d'envoyer trop de messages au Wi-Fi
     }
 
-    // --- DESIGN (CSS) ---
+    // --- DESIGN VISUEL (CSS) ---
     static get styles() {
         return css`
             :host { display: block; }
 
             .card-content {
-                padding: 20px;
+                padding: 10px;
                 display: flex;
-                flex-direction: column;
-                align-items: flex-start; /* ALIGNEMENT À GAUCHE */
-                background: #1a1a1a;
-                border-radius: var(--ha-card-border-radius, 12px);
+                justify-content: flex-start; /* ALIGNE LE JOYSTICK À GAUCHE */
+                background: none;
             }
 
-            /* LA BASE DU JOYSTICK (Le trou avec effet soufflet) */
+            /* LA BASE NOIRE (L'effet soufflet) */
             .base {
                 width: 160px; height: 160px;
                 border-radius: 50%;
                 position: relative;
                 background: #000;
-                /* Anneaux concentriques style caoutchouc */
+                /* Anneaux concentriques style caoutchouc industriel */
                 background-image: repeating-radial-gradient(
                     circle at center,
                     #222 0px, #222 8px,
@@ -64,14 +62,13 @@ class JoystickRoverCard extends LitElement {
                 );
                 border: 4px solid #333;
                 box-shadow: inset 0 0 25px rgba(0,0,0,1);
-                touch-action: none; /* Empêche la page de bouger sur mobile */
+                touch-action: none; /* Désactive le scroll de la page quand on touche */
                 display: flex;
                 justify-content: center;
                 align-items: center;
-                margin-left: 10px;
             }
 
-            /* LUMIÈRE DYNAMIQUE (L'effet qui bouge sous le bouton) */
+            /* L'EFFET DE DÉFORMATION (Reflet interne qui bouge) */
             .bellows-glow {
                 position: absolute;
                 width: 100%; height: 100%;
@@ -85,6 +82,7 @@ class JoystickRoverCard extends LitElement {
                 border-radius: 50%;
                 position: absolute;
                 cursor: grab;
+                /* Dégradé pour donner l'effet "creux" */
                 background: radial-gradient(circle at 50% 15%, #03a9f4 0%, #0288d1 60%, #01579b 100%);
                 box-shadow: 
                     0 15px 30px rgba(0,0,0,0.8),
@@ -93,27 +91,17 @@ class JoystickRoverCard extends LitElement {
                 z-index: 10;
                 touch-action: none;
             }
-
-            /* TEXTE DE LA VITESSE */
-            .speed-label {
-                margin-top: 15px;
-                color: #03a9f4;
-                font-family: 'Courier New', monospace;
-                font-size: 14px;
-                font-weight: bold;
-                margin-left: 20px;
-            }
         `;
     }
 
-    // --- AFFICHAGE (HTML) ---
+    // --- STRUCTURE HTML ---
     render() {
-        // Calcul du mouvement de l'ombre interne pour l'effet soufflet
+        // On calcule un léger mouvement pour le reflet du soufflet
         const moveX = (this.x / this.maxDistance) * 15;
         const moveY = (this.y / this.maxDistance) * 15;
 
         return html`
-            <ha-card .header=${this.config.title}>
+            <ha-card>
                 <div class="card-content">
                     <div id="joystick-base" class="base">
                         <div class="bellows-glow" style="transform: translate(${moveX}px, ${moveY}px);"></div>
@@ -121,13 +109,12 @@ class JoystickRoverCard extends LitElement {
                              style="transform: translate(${this.x}px, ${this.y}px);">
                         </div>
                     </div>
-                    <div class="speed-label">HEISENBERG SPEED: ${Math.round(this.displaySpeed)}%</div>
                 </div>
             </ha-card>
         `;
     }
 
-    // --- LOGIQUE ET ÉVÉNEMENTS ---
+    // --- GESTION DES ÉVÉNEMENTS ---
     firstUpdated() {
         this.baseElement = this.shadowRoot.querySelector('#joystick-base');
         this.handleElement = this.shadowRoot.querySelector('#joystick-handle');
@@ -136,48 +123,45 @@ class JoystickRoverCard extends LitElement {
 
     _addListeners() {
         const h = this.handleElement;
-        // Détection souris
+        // Souris
         h.addEventListener('mousedown', (e) => this.onStart(e));
         document.addEventListener('mousemove', (e) => this.onMove(e));
         document.addEventListener('mouseup', () => this.onEnd());
-        // Détection tactile (Doigt)
+        // Doigt (Mobile/Tablette)
         h.addEventListener('touchstart', (e) => this.onStart(e), {passive: false});
         document.addEventListener('touchmove', (e) => this.onMove(e), {passive: false});
         document.addEventListener('touchend', () => this.onEnd());
     }
 
-    // Quand on commence à toucher le bouton
     onStart(e) {
         e.preventDefault();
         this.isDragging = true;
-        this.handleElement.style.transition = 'none'; // On enlève les animations pour la réactivité
+        this.handleElement.style.transition = 'none'; // Réactivité instantanée quand on touche
     }
 
-    // Quand on relâche le bouton (Retour au centre)
     onEnd() {
         if (!this.isDragging) return;
         this.isDragging = false;
-        this.handleElement.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; // Effet ressort
+        // Effet ressort pour revenir au centre
+        this.handleElement.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
         this.x = 0;
         this.y = 0;
         
-        // CORRECTION DU LAG : On force l'affichage à 0 tout de suite
-        this.displaySpeed = 0; 
+        // On envoie immédiatement l'arrêt (Vitesse 0) sans attendre
         this.sendCommands(0);
     }
 
-    // Quand on déplace le bouton
     onMove(e) {
         if (!this.isDragging) return;
         const rect = this.baseElement.getBoundingClientRect();
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
         const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-        // Calcul de la distance depuis le centre
+        // Calcul de la position par rapport au centre de la base
         let dx = clientX - (rect.left + rect.width / 2);
         let dy = clientY - (rect.top + rect.height / 2);
 
-        // On limite le bouton à l'intérieur du cercle noir
+        // On bloque le bouton s'il dépasse le bord de la base
         const dist = Math.sqrt(dx*dx + dy*dy);
         if (dist > this.maxDistance) {
             dx *= this.maxDistance / dist;
@@ -187,11 +171,11 @@ class JoystickRoverCard extends LitElement {
         this.x = dx;
         this.y = dy;
 
-        // On calcule la vitesse (0 à 100%)
+        // Calcul de la puissance demandée (0 à 100)
         const speedPerc = Math.round((-this.y / this.maxDistance) * 100);
-        this.displaySpeed = speedPerc; // Mise à jour visuelle immédiate
 
-        // LIMITATION DE DÉBIT : On n'envoie à l'ESP32 que toutes les 60ms
+        // --- ANTI-LAG : LIMITATION DU NOMBRE DE MESSAGES ---
+        // On n'envoie un ordre que toutes les 60ms pour ne pas saturer l'ESP32-S3
         const now = Date.now();
         if (now - this.lastSend > 60) {
             this.sendCommands(speedPerc);
@@ -199,19 +183,19 @@ class JoystickRoverCard extends LitElement {
         }
     }
 
-    // Envoi des ordres à Home Assistant (Moteurs)
+    // --- COMMUNICATION AVEC HOME ASSISTANT ---
     sendCommands(speedPerc) {
         if (!this.hass) return;
 
         let finalSpeed = 0;
-        // Zone morte et courbe de puissance
+        // On définit la zone morte et la courbe de puissance (35% minimum pour démarrer)
         if (Math.abs(speedPerc) > 5) {
             finalSpeed = 35 + (Math.abs(speedPerc) * 0.65);
             if (speedPerc < 0) finalSpeed = -finalSpeed;
         }
         
         const val = Math.round(finalSpeed);
-        // On envoie la même vitesse aux deux moteurs
+        // On envoie la commande aux deux entités moteurs simultanément
         const entities = ['number.vitesse_moteur_gauche', 'number.vitesse_moteur_droit'];
         
         entities.forEach(ent => {
@@ -223,5 +207,5 @@ class JoystickRoverCard extends LitElement {
     }
 }
 
-// Enregistrement de la carte
+// On enregistre la balise personnalisée pour Home Assistant
 customElements.define('joystick-rover-card', JoystickRoverCard);
