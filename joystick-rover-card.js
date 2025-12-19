@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.7.1 - MÉTHODE HYBRIDE COMMENTÉE
+// V1.8.0 - MÉTHODE HYBRIDE AVEC DIRECTION (SERVO)
 // =========================================================================
 
 import {
@@ -24,16 +24,15 @@ class JoystickRoverCard extends LitElement {
 
     constructor() {
         super();
-        this.baseRadius = 80;       // Taille du socle
-        this.handleRadius = 41;     // Taille du bouton
+        this.baseRadius = 80;
+        this.handleRadius = 41;
         this.maxDistance = this.baseRadius - this.handleRadius;
         this.x = 0;
         this.y = 0;
-        this.isDragging = false;    // Suivi de l'état du doigt
-        this.lastSend = 0;          // Limiteur de débit pour le Wi-Fi
+        this.isDragging = false;
+        this.lastSend = 0;
     }
 
-    // --- DESIGN ---
     static get styles() {
         return css`
             :host { display: block; }
@@ -66,7 +65,6 @@ class JoystickRoverCard extends LitElement {
         `;
     }
 
-    // --- LOGIQUE TACTILE ET SOURIS ---
     firstUpdated() {
         this.baseElement = this.shadowRoot.querySelector('#joystick-base');
         this.handleElement = this.shadowRoot.querySelector('#joystick-handle');
@@ -76,47 +74,42 @@ class JoystickRoverCard extends LitElement {
     _addListeners() {
         const h = this.handleElement;
         
-        // Début du contact
         const start = (e) => { 
             e.preventDefault(); 
             this.isDragging = true; 
-            h.style.transition = 'none'; // Pas d'animation pour une réponse immédiate
+            h.style.transition = 'none';
         };
 
-        // Fin du contact (Retour au centre)
         const end = () => { 
             if (!this.isDragging) return; 
             this.isDragging = false;
-            h.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)'; // Effet ressort
+            h.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
             this.x = 0; 
             this.y = 0; 
-            this.sendCommands(0); // On coupe les moteurs
+            this.sendCommands(0, 0); // On remet tout à zéro (vitesse et direction)
         };
 
-        // Mouvement
         const move = (e) => {
             if (!this.isDragging) return;
             const rect = this.baseElement.getBoundingClientRect();
             const clientX = e.touches ? e.touches[0].clientX : e.clientX;
             const clientY = e.touches ? e.touches[0].clientY : e.clientY;
             
-            // Calcul de la distance
             let dx = clientX - (rect.left + rect.width / 2);
             let dy = clientY - (rect.top + rect.height / 2);
             const dist = Math.sqrt(dx*dx + dy*dy);
 
-            // Limitation au cercle
             if (dist > this.maxDistance) { dx *= this.maxDistance / dist; dy *= this.maxDistance / dist; }
             this.x = dx; 
             this.y = dy;
 
-            // Conversion en % de puissance
+            // --- CALCULS DES POURCENTAGES ---
             const speedPerc = Math.round((-this.y / this.maxDistance) * 100);
+            const steerPerc = Math.round((this.x / this.maxDistance) * 100); // Axe X pour le Servo
 
-            // ANTI-LAG : On envoie seulement toutes les 60ms
             const now = Date.now();
             if (now - this.lastSend > 60) { 
-                this.sendCommands(speedPerc); 
+                this.sendCommands(speedPerc, steerPerc); 
                 this.lastSend = now; 
             }
         };
@@ -126,11 +119,10 @@ class JoystickRoverCard extends LitElement {
         document.addEventListener('mouseup', end); document.addEventListener('touchend', end);
     }
 
-    // --- COMMUNICATION HYBRIDE ---
-    sendCommands(speedPerc) {
+    sendCommands(speedPerc, steerPerc) {
         if (!this.hass) return;
 
-        // --- PUISSANCE MOTEURS ---
+        // 1. GESTION DES MOTEURS (Vitesse)
         let pwr = 0;
         if (Math.abs(speedPerc) > 5) {
             pwr = 35 + (Math.abs(speedPerc) * 0.65);
@@ -138,20 +130,20 @@ class JoystickRoverCard extends LitElement {
         }
         const val = Math.round(pwr);
 
-        // On envoie uniquement l'ordre aux moteurs
-        const entities = ['number.vitesse_moteur_gauche', 'number.vitesse_moteur_droit'];
-        entities.forEach(ent => {
+        const motorEntities = ['number.vitesse_moteur_gauche', 'number.vitesse_moteur_droit'];
+        motorEntities.forEach(ent => {
             this.hass.callService('number', 'set_value', {
                 entity_id: ent,
                 value: val
             });
         });
 
-        // NOTE : On ne touche plus à input_number.vitesse_rover ici.
-        // C'est l'ESP32 qui s'en occupe maintenant.
+        // 2. GESTION DU SERVO (Direction)
+        // On envoie directement la valeur steerPerc (-100 à 100)
+        this.hass.callService('number', 'set_value', {
+            entity_id: 'number.direction_home_rover', // Vérifie bien ce nom d'entité dans HA !
+            value: steerPerc
+        });
     }
 }
 customElements.define('joystick-rover-card', JoystickRoverCard);
-
-
-
