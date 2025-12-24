@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.8.0 - MÉTHODE HYBRIDE AVEC DIRECTION (SERVO)
+// V1.8.1 - ALIGNEMENT GAUCHE ET TRANSPARENCE (POUR LIBÉRER LE CENTRE)
 // =========================================================================
 
 import {
@@ -10,7 +10,6 @@ import {
 
 class JoystickRoverCard extends LitElement {
     
-    // --- CONFIGURATION ---
     setConfig(config) { this.config = config; }
 
     static get properties() {
@@ -35,8 +34,24 @@ class JoystickRoverCard extends LitElement {
 
     static get styles() {
         return css`
-            :host { display: block; }
-            .card-content { padding: 10px; display: flex; justify-content: flex-start; background: none; }
+            :host { 
+                display: block; 
+                background: none !important; 
+            }
+            ha-card { 
+                background: none !important; 
+                border: none !important; 
+                box-shadow: none !important;
+                display: flex;
+                justify-content: flex-start; /* ALIGNÉ À GAUCHE */
+                align-items: center;
+            }
+            .card-content { 
+                padding: 10px 0px 10px 10px; /* Marges : Haut, Droite (0), Bas, Gauche (10) */
+                display: flex; 
+                justify-content: flex-start; 
+                background: none; 
+            }
             .base {
                 width: 160px; height: 160px; border-radius: 50%; position: relative;
                 background: #000; border: 4px solid #333;
@@ -73,20 +88,13 @@ class JoystickRoverCard extends LitElement {
 
     _addListeners() {
         const h = this.handleElement;
-        
-        const start = (e) => { 
-            e.preventDefault(); 
-            this.isDragging = true; 
-            h.style.transition = 'none';
-        };
-
+        const start = (e) => { e.preventDefault(); this.isDragging = true; h.style.transition = 'none'; };
         const end = () => { 
             if (!this.isDragging) return; 
             this.isDragging = false;
             h.style.transition = 'transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-            this.x = 0; 
-            this.y = 0; 
-            this.sendCommands(0, 0); // On remet tout à zéro (vitesse et direction)
+            this.x = 0; this.y = 0; 
+            this.sendCommands(0, 0);
         };
 
         const move = (e) => {
@@ -100,18 +108,13 @@ class JoystickRoverCard extends LitElement {
             const dist = Math.sqrt(dx*dx + dy*dy);
 
             if (dist > this.maxDistance) { dx *= this.maxDistance / dist; dy *= this.maxDistance / dist; }
-            this.x = dx; 
-            this.y = dy;
+            this.x = dx; this.y = dy;
 
-            // --- CALCULS DES POURCENTAGES ---
             const speedPerc = Math.round((-this.y / this.maxDistance) * 100);
-            const steerPerc = Math.round((this.x / this.maxDistance) * 100); // Axe X pour le Servo
+            const steerPerc = Math.round((this.x / this.maxDistance) * 100);
 
             const now = Date.now();
-            if (now - this.lastSend > 60) { 
-                this.sendCommands(speedPerc, steerPerc); 
-                this.lastSend = now; 
-            }
+            if (now - this.lastSend > 60) { this.sendCommands(speedPerc, steerPerc); this.lastSend = now; }
         };
 
         h.addEventListener('mousedown', start); h.addEventListener('touchstart', start);
@@ -121,29 +124,17 @@ class JoystickRoverCard extends LitElement {
 
     sendCommands(speedPerc, steerPerc) {
         if (!this.hass) return;
-
-        // 1. GESTION DES MOTEURS (Vitesse)
         let pwr = 0;
         if (Math.abs(speedPerc) > 5) {
             pwr = 35 + (Math.abs(speedPerc) * 0.65);
             if (speedPerc < 0) pwr = -pwr;
         }
         const val = Math.round(pwr);
-
         const motorEntities = ['number.vitesse_moteur_gauche', 'number.vitesse_moteur_droit'];
         motorEntities.forEach(ent => {
-            this.hass.callService('number', 'set_value', {
-                entity_id: ent,
-                value: val
-            });
+            this.hass.callService('number', 'set_value', { entity_id: ent, value: val });
         });
-
-        // 2. GESTION DU SERVO (Direction)
-        // On envoie directement la valeur steerPerc (-100 à 100)
-        this.hass.callService('number', 'set_value', {
-            entity_id: 'number.direction_home_rover', // Vérifie bien ce nom d'entité dans HA !
-            value: steerPerc
-        });
+        this.hass.callService('number', 'set_value', { entity_id: 'number.direction_home_rover', value: steerPerc });
     }
 }
 customElements.define('joystick-rover-card', JoystickRoverCard);
