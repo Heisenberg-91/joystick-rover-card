@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.8.1 - ALIGNEMENT GAUCHE ET TRANSPARENCE (POUR LIBÉRER LE CENTRE)
+// V1.8.2 - TAILLE AUGMENTÉE (+20%) & ALIGNEMENT GAUCHE
 // =========================================================================
 
 import {
@@ -23,8 +23,9 @@ class JoystickRoverCard extends LitElement {
 
     constructor() {
         super();
-        this.baseRadius = 80;
-        this.handleRadius = 41;
+        // Valeurs augmentées de 20% (Base: 80->96, Handle: 41->49)
+        this.baseRadius = 96; 
+        this.handleRadius = 49;
         this.maxDistance = this.baseRadius - this.handleRadius;
         this.x = 0;
         this.y = 0;
@@ -43,24 +44,26 @@ class JoystickRoverCard extends LitElement {
                 border: none !important; 
                 box-shadow: none !important;
                 display: flex;
-                justify-content: flex-start; /* ALIGNÉ À GAUCHE */
+                justify-content: flex-start;
                 align-items: center;
             }
             .card-content { 
-                padding: 10px 0px 10px 10px; /* Marges : Haut, Droite (0), Bas, Gauche (10) */
+                padding: 10px 0px 10px 10px; 
                 display: flex; 
                 justify-content: flex-start; 
                 background: none; 
             }
             .base {
-                width: 160px; height: 160px; border-radius: 50%; position: relative;
+                /* Taille augmentée : 160px -> 192px */
+                width: 192px; height: 192px; border-radius: 50%; position: relative;
                 background: #000; border: 4px solid #333;
                 background-image: repeating-radial-gradient(circle, #222 0px, #222 8px, #0a0a0a 10px, #000 12px);
                 box-shadow: inset 0 0 25px rgba(0,0,0,1); touch-action: none;
                 display: flex; justify-content: center; align-items: center;
             }
             .handle {
-                width: 82px; height: 82px; border-radius: 50%; position: absolute;
+                /* Taille augmentée : 82px -> 98px */
+                width: 98px; height: 98px; border-radius: 50%; position: absolute;
                 background: radial-gradient(circle at 50% 15%, #03a9f4 0%, #0288d1 60%, #01579b 100%);
                 box-shadow: 0 15px 30px rgba(0,0,0,0.8), inset 0 10px 15px rgba(0,0,0,0.5);
                 z-index: 10; cursor: grab;
