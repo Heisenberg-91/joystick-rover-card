@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.8.2 - TAILLE AUGMENTÉE (+20%) & ALIGNEMENT GAUCHE
+// V1.8.3 - COLLÉ À GAUCHE & TAILLE +20%
 // =========================================================================
 
 import {
@@ -23,7 +23,6 @@ class JoystickRoverCard extends LitElement {
 
     constructor() {
         super();
-        // Valeurs augmentées de 20% (Base: 80->96, Handle: 41->49)
         this.baseRadius = 96; 
         this.handleRadius = 49;
         this.maxDistance = this.baseRadius - this.handleRadius;
@@ -44,25 +43,24 @@ class JoystickRoverCard extends LitElement {
                 border: none !important; 
                 box-shadow: none !important;
                 display: flex;
-                justify-content: flex-start;
+                justify-content: flex-start; /* Aligne le contenu au début (gauche) */
                 align-items: center;
             }
             .card-content { 
-                padding: 10px 0px 10px 10px; 
+                padding: 10px 0px 10px 0px; /* Supprime le padding à gauche (0px) */
                 display: flex; 
                 justify-content: flex-start; 
                 background: none; 
             }
             .base {
-                /* Taille augmentée : 160px -> 192px */
                 width: 192px; height: 192px; border-radius: 50%; position: relative;
                 background: #000; border: 4px solid #333;
                 background-image: repeating-radial-gradient(circle, #222 0px, #222 8px, #0a0a0a 10px, #000 12px);
                 box-shadow: inset 0 0 25px rgba(0,0,0,1); touch-action: none;
                 display: flex; justify-content: center; align-items: center;
+                margin-left: 0; /* Force l'absence de marge */
             }
             .handle {
-                /* Taille augmentée : 82px -> 98px */
                 width: 98px; height: 98px; border-radius: 50%; position: absolute;
                 background: radial-gradient(circle at 50% 15%, #03a9f4 0%, #0288d1 60%, #01579b 100%);
                 box-shadow: 0 15px 30px rgba(0,0,0,0.8), inset 0 10px 15px rgba(0,0,0,0.5);
