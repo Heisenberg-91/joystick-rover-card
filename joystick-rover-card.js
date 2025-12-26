@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.8.3 - COLLÉ À GAUCHE & TAILLE +20%
+// V1.8.5 - STYLE CHROME CONCAVE - TAILLE +20% - COLLÉ À GAUCHE
 // =========================================================================
 
 import {
@@ -43,11 +43,11 @@ class JoystickRoverCard extends LitElement {
                 border: none !important; 
                 box-shadow: none !important;
                 display: flex;
-                justify-content: flex-start; /* Aligne le contenu au début (gauche) */
+                justify-content: flex-start;
                 align-items: center;
             }
             .card-content { 
-                padding: 10px 0px 10px 0px; /* Supprime le padding à gauche (0px) */
+                padding: 10px 0px 10px 0px; 
                 display: flex; 
                 justify-content: flex-start; 
                 background: none; 
@@ -58,13 +58,31 @@ class JoystickRoverCard extends LitElement {
                 background-image: repeating-radial-gradient(circle, #222 0px, #222 8px, #0a0a0a 10px, #000 12px);
                 box-shadow: inset 0 0 25px rgba(0,0,0,1); touch-action: none;
                 display: flex; justify-content: center; align-items: center;
-                margin-left: 0; /* Force l'absence de marge */
             }
             .handle {
                 width: 98px; height: 98px; border-radius: 50%; position: absolute;
-                background: radial-gradient(circle at 50% 15%, #03a9f4 0%, #0288d1 60%, #01579b 100%);
-                box-shadow: 0 15px 30px rgba(0,0,0,0.8), inset 0 10px 15px rgba(0,0,0,0.5);
+                
+                /* Nouveau Gradient concave */
+                background: radial-gradient(circle at center, #014172 0%, #0288d1 85%, #03a9f4 100%);
+                
+                /* Bordure chromée et ombres complexes */
+                border: 2px solid #01579b;
+                box-shadow: 
+                    0 12px 24px rgba(0,0,0,0.8),               /* Ombre portée */
+                    inset 0 10px 18px rgba(0,0,0,0.7),         /* Effet creux */
+                    inset 0 0 0 2px rgba(255,255,255,0.15),    /* Reflet arête */
+                    0 0 0 1px rgba(0,0,0,0.5);                 /* Contour net */
+                
                 z-index: 10; cursor: grab;
+                display: flex; justify-content: center; align-items: center;
+            }
+
+            /* Ajout du reflet brillant sur le dessus */
+            .handle::after {
+                content: ""; position: absolute; top: 10%; left: 10%; width: 80%; height: 80%;
+                border-radius: 50%;
+                background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, transparent 50%);
+                pointer-events: none;
             }
         `;
     }
