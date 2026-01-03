@@ -1,5 +1,5 @@
 // =========================================================================
-// V1.8.5 - STYLE CHROME CONCAVE - TAILLE +20% - COLLÉ À GAUCHE
+// V1.8.6 - STYLE CHROME CONCAVE - TAILLE +20% - COLLÉ À GAUCHE
 // =========================================================================
 
 import {
@@ -143,17 +143,34 @@ class JoystickRoverCard extends LitElement {
 
     sendCommands(speedPerc, steerPerc) {
         if (!this.hass) return;
+
+        // 1. Gestion de la puissance (Vitesse Y)
         let pwr = 0;
+        // On ajoute une petite "zone morte" de 5% pour éviter les sifflements à l'arrêt
         if (Math.abs(speedPerc) > 5) {
+            // Mapping optionnel : ici on commence à 35% de puissance minimum 
+            // pour vaincre l'inertie des moteurs
             pwr = 35 + (Math.abs(speedPerc) * 0.65);
             if (speedPerc < 0) pwr = -pwr;
         }
         const val = Math.round(pwr);
-        const motorEntities = ['number.vitesse_moteur_gauche', 'number.vitesse_moteur_droit'];
-        motorEntities.forEach(ent => {
-            this.hass.callService('number', 'set_value', { entity_id: ent, value: val });
+
+        // 2. Envoi aux moteurs (on utilise les IDs exacts du YAML)
+        this.hass.callService('number', 'set_value', { 
+            entity_id: 'number.vitesse_moteur_gauche', 
+            value: val 
         });
-        this.hass.callService('number', 'set_value', { entity_id: 'number.direction_home_rover', value: steerPerc });
+        this.hass.callService('number', 'set_value', { 
+            entity_id: 'number.vitesse_moteur_droit', 
+            value: val 
+        });
+
+        // 3. Envoi à la direction (X)
+        this.hass.callService('number', 'set_value', { 
+            entity_id: 'number.direction_home_rover', 
+            value: steerPerc 
+        });
     }
 }
 customElements.define('joystick-rover-card', JoystickRoverCard);
+
